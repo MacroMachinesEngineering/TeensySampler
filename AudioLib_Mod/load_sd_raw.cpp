@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-#include "play_sd_raw.h"
+#include "load_sd_raw.h"
 #include "spi_interrupt.h"
 
 #define B2M (uint32_t)((double)4294967296000.0 / AUDIO_SAMPLE_RATE_EXACT / 2.0) // 97352592
@@ -52,10 +52,10 @@ bool AudioLoadSdRaw::load(const char *filename)
 	rewind();
 }
 
-bool AudioLoadSdRaw::setPos(uint64_t pos) /* closest block at this time */
+void AudioLoadSdRaw::setPos(uint64_t pos) /* closest block at this time */
 {
 	uint32_t file_offset;
-	file_offset = (skip<<32) / B2M;
+	file_offset = (pos<<32) / B2M;
 
 	file_offset /= 512;
 	file_offset *= 512;
@@ -85,7 +85,7 @@ void AudioLoadSdRaw::rewind()
 		}
 }
 
-void AudioLoadSdRaw::play()
+bool AudioLoadSdRaw::play()
 {
 	stop();
 	AudioStartUsingSPI();
@@ -113,6 +113,7 @@ void AudioLoadSdRaw::stop(void)
 
 void AudioLoadSdRaw::update(void)
 {
+	bool moreData;
 	unsigned int i, n;
 	audio_block_t *block;
 
@@ -124,13 +125,13 @@ void AudioLoadSdRaw::update(void)
 	if (block == NULL) return;
 
 	if (goForward) {
-		moreData = rawFile.available();
+		moreData = rawfile.available();
 	} else {
 		moreData = rawfile.position() > 0;
 		rawfile.seek(rawfile.position()-AUDIO_BLOCK_SAMPLES*4); // *2 would take us back to where we just were
 	}
 
-	if (moredata) {
+	if (moreData) {
 		// we can read more data from the file...
 		n = rawfile.read(block->data, AUDIO_BLOCK_SAMPLES*2);
 		for (i=n/2; i < AUDIO_BLOCK_SAMPLES; i++) {
@@ -148,7 +149,7 @@ void AudioLoadSdRaw::update(void)
 	release(block);
 }
 
-void AudioLoadSdRaw::reverseMem(uint16_t *data)
+void AudioLoadSdRaw::reverseMem(int16_t *data)
 {
 	int i;
 	uint16_t tmp;

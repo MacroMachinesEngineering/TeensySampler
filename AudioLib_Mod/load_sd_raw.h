@@ -35,10 +35,13 @@ class AudioLoadSdRaw : public AudioStream
 public:
 	AudioLoadSdRaw(void) : AudioStream(0, NULL) { begin(); }
 	void begin(void);
-	void load(const char *filename)
+	bool load(const char *filename);
 	bool play(void);
 	void stop(void);
 	void rewind(void);
+	void setPos(uint64_t pos); /* closest block at this time */
+	void setSpeed(int speedIn);
+
 	bool isPlaying(void) { return playing; }
 	uint32_t positionMillis(void);
 	uint32_t lengthMillis(void);
@@ -48,6 +51,8 @@ private:
 	volatile bool playing;
 	bool goForward;
 	int speed;
+	void reverseMem(int16_t *data);
+
 };
 
 #endif
