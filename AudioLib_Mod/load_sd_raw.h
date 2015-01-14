@@ -40,7 +40,7 @@ public:
 	void stop(void);
 	void rewind(void);
 	void setPos(uint64_t pos); /* closest block at this time */
-	void setSpeed(int speedIn);
+	void setSpeed(double speedIn);
 
 	bool isPlaying(void) { return playing; }
 	uint32_t positionMillis(void);
@@ -51,7 +51,12 @@ private:
 	volatile bool playing;
 	bool goForward;
 	int speed;
+	int blockOffset;
+        audio_block_t *pending_block;
 	void reverseMem(int16_t *data);
+	void flush(void);
+	void submit(audio_block_t *block);
+
 
 };
 

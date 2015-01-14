@@ -34,6 +34,7 @@ void AudioLoadSdRaw::begin(void)
 {
 	playing = false;
 	speed = 1;
+        pending_block = allocate();
 }
 
 bool AudioLoadSdRaw::load(const char *filename)
@@ -63,15 +64,15 @@ void AudioLoadSdRaw::setPos(uint64_t pos) /* closest block at this time */
 	rawfile.seek(file_offset);
 }
 
-void AudioLoadSdRaw::setSpeed(int speedIn)
+void AudioLoadSdRaw::setSpeed(double speedIn)
 {
 	if (speedIn) {
 		if (speed < 0) {
 			goForward = 0;
-			speed = -speedIn;
+			speed = (-speedIn * 32768.0);
 		} else {
 			goForward = 1;
-			speed = speedIn;
+			speed = (speedIn * 32768.0);
 			}
 		}
 }
@@ -83,6 +84,7 @@ void AudioLoadSdRaw::rewind()
 	} else {
 		rawfile.seek((rawfile.size()/512)*512);
 		}
+	blockOffset = 0;
 }
 
 bool AudioLoadSdRaw::play()
@@ -111,6 +113,31 @@ void AudioLoadSdRaw::stop(void)
 	}
 }
 
+void AudioLoadSdRaw::flush(void)
+{
+	int i;
+
+	for (i=blockOffset; i < AUDIO_BLOCK_SAMPLES; i++) {
+		pending_block->data[i] = 0;
+	}
+	transmit(pending_block);
+	blockOffset = 0;
+
+}
+
+void AudioLoadSdRaw::submit(audio_block_t *block)
+{
+	int i;
+
+	for (i=0; i<AUDIO_BLOCK_SAMPLES*32768; i += speed) {
+		pending_block[blockOffset++] = block[i/32768];
+		if (blockOffset > AUDIO_BLOCK_SAMPLES) {
+			transmit(pending_block);
+			blockOffset -= AUDIO_BLOCK_SAMPLES;
+		}
+	}
+}
+
 void AudioLoadSdRaw::update(void)
 {
 	bool moreData;
@@ -131,6 +158,8 @@ void AudioLoadSdRaw::update(void)
 		rawfile.seek(rawfile.position()-AUDIO_BLOCK_SAMPLES*4); // *2 would take us back to where we just were
 	}
 
+	// We'll be decimating/interpolating into pending_block here
+
 	if (moreData) {
 		// we can read more data from the file...
 		n = rawfile.read(block->data, AUDIO_BLOCK_SAMPLES*2);
@@ -140,8 +169,9 @@ void AudioLoadSdRaw::update(void)
 		if (! goForward) {
 			reverseMem(block->data);
 		}
-		transmit(block);
+		submit(block);
 	} else {
+		flush();
 		rawfile.close();
 		AudioStopUsingSPI();
 		playing = false;
